@@ -40,12 +40,11 @@ func (progressReader *ProgressReader) CopyWithProgress(dst io.Writer) error {
 		wg.Add(1)
 
 		go func() {
-			progressReader.mu.RLock()
-			defer progressReader.mu.RUnlock()
-			defer close(er)
 			defer wg.Done()
 
+			progressReader.mu.Lock()
 			n, err := progressReader.Read(buf)
+			progressReader.mu.Unlock()
 			if n > 0 {
 				_, err := dst.Write(buf[:n])
 				if err != nil {
@@ -53,6 +52,7 @@ func (progressReader *ProgressReader) CopyWithProgress(dst io.Writer) error {
 					return
 				}
 
+				progressReader.mu.Lock()
 				totalRead += n
 				newProgress := float64(totalRead) / float64(progressReader.TotalSize) * 100
 
@@ -60,6 +60,7 @@ func (progressReader *ProgressReader) CopyWithProgress(dst io.Writer) error {
 					progressReader.updateProgress(int(newProgress))
 					lastUpdate = int(newProgress)
 				}
+				progressReader.mu.Unlock()
 
 				if err == io.EOF {
 					er <- err
@@ -71,6 +72,8 @@ func (progressReader *ProgressReader) CopyWithProgress(dst io.Writer) error {
 				er <- err
 				return
 			}
+
+			close(er)
 		}()
 
 		wg.Wait()

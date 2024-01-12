@@ -9,6 +9,7 @@ import (
 const barWidth = 40
 
 type ProgressReader struct {
+	mu        sync.RWMutex
 	Reader    io.Reader
 	TotalSize int
 }
@@ -39,6 +40,8 @@ func (progressReader *ProgressReader) CopyWithProgress(dst io.Writer) error {
 		wg.Add(1)
 
 		go func() {
+			progressReader.mu.RLock()
+			defer progressReader.mu.RUnlock()
 			defer close(er)
 			defer wg.Done()
 
